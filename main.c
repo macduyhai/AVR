@@ -1,21 +1,38 @@
+/**************************************/
 #include "stm32f10x_conf.h"
+#include <stdio.h>
 
-int led[8]={GPIO_Pin_0,GPIO_Pin_1,GPIO_Pin_2,GPIO_Pin_3,GPIO_Pin_4,GPIO_Pin_5,GPIO_Pin_6,GPIO_Pin_7};
 
-/*******************************/
+/**************************************/
+#define  FLASH_SIZE  (*((uint16_t*)0x1FFFF7E0))
+#define  U_ID_0      (*((uint32_t*)0x1FFFF7E8))
+#define  U_ID_1      (*((uint32_t*)0x1FFFF7EC))
+#define  U_ID_2      (*((uint32_t*)0x1FFFF7F0))
 
-void LED_A0_config(void)
+void PrintSystemInfo()
 {
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);  // Enable clock for GPIOA
+  printf("\n");
+  printf("      U_ID = %08X %08X %08X\n", U_ID_2, U_ID_1, U_ID_0);
+  printf("FLASH_SIZE = %d KB\n", FLASH_SIZE);
+  printf("\n");
 
-	GPIO_InitTypeDef	led_a0_init_struct;
-	led_a0_init_struct.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1 | GPIO_Pin_2|GPIO_Pin_3|GPIO_Pin_4|GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
-	led_a0_init_struct.GPIO_Speed = GPIO_Speed_50MHz;
-	led_a0_init_struct.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_Init(GPIOA, &led_a0_init_struct);
+  printf("RCC_CR    = %08X\n", RCC->CR);
+  printf("RCC_CFGR  = %08X\n", RCC->CFGR);
+  printf("FLASH_ACR = %08X\n", FLASH->ACR);
+  printf("\n");
+
+  RCC_ClocksTypeDef RCC_ClocksStatus;
+  RCC_GetClocksFreq(&RCC_ClocksStatus);
+  printf("RCC_SYSCLK_Frequency = %ld\n", RCC_ClocksStatus.SYSCLK_Frequency);
+  printf("RCC_HCLK_Frequency   = %ld\n", RCC_ClocksStatus.HCLK_Frequency);
+  printf("RCC_PCLK1_Frequency  = %ld\n", RCC_ClocksStatus.PCLK1_Frequency);
+  printf("RCC_PCLK2_Frequency  = %ld\n", RCC_ClocksStatus.PCLK2_Frequency);
+  printf("RCC_ADCCLK_Frequency = %ld\n", RCC_ClocksStatus.ADCCLK_Frequency);
+  printf("\n");
 }
 
-/*****************************/
+
+/**************************************/
 void DWT_config(void)
 {
 	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;  // enable Debug block
@@ -53,80 +70,89 @@ uint64_t dwt_Micros()
 {
   return dwt_CycleCount64() / 72;
 }
-void giot_nuoc()
+
+
+/**************************************/
+void UART1_Init_A9A10()
 {
-  int dem=7;
-  int t=dem;
+  // Enable clock for UART1 & GPIOA
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE);
 
-  while(dem!=0)
+  USART_InitTypeDef USART_InitStructure;
+  USART_InitStructure.USART_BaudRate = 115200;
+  USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+  USART_InitStructure.USART_StopBits = USART_StopBits_1;
+  USART_InitStructure.USART_Parity = USART_Parity_No;
+  USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+  USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+  USART_Init(USART1, &USART_InitStructure);       // Configure the USART1
+
+  //USART_ITConfig(USART1, USART_IT_TXE, ENABLE);  // TX Empty
+  //USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);  // RX Not Empty
+
+  USART_Cmd(USART1, ENABLE);  // enable UART1
+
   {
-    for (int i=0;i<dem;i++)
-    {
-      GPIO_SetBits(GPIOA, led[i]);
-      delay_ms(100);
-      GPIO_ResetBits(GPIOA, led[i]);
-      //delay_ms(100);
-    }
-    GPIO_SetBits(GPIOA, led[dem-1]);
-    delay_ms(100);
-    dem--;
+    GPIO_InitTypeDef	gpio_init_struct;
 
+    // GPIOA PIN9 alternative function Tx
+    gpio_init_struct.GPIO_Pin = GPIO_Pin_9;
+    gpio_init_struct.GPIO_Speed = GPIO_Speed_10MHz;
+    gpio_init_struct.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_Init(GPIOA, &gpio_init_struct);
+
+    // GPIOA PIN10 alternative function Rx
+    gpio_init_struct.GPIO_Pin = GPIO_Pin_10;
+    gpio_init_struct.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_Init(GPIOA, &gpio_init_struct);
   }
-  for( int i=0;i<t;i++){
-   GPIO_ResetBits(GPIOA, led[i]);
-  }
-  delay_ms(100);
 }
- void traiphai()
- {
-  int dem=7;
-  for(int i=0;i<dem;i++)
-  {
-   GPIO_SetBits(GPIOA,led[i]);
-   delay_ms(100);
-   GPIO_ResetBits(GPIOA, led[i]);
-   delay_ms(100);
-  }
-  for(int i=dem-1;i>=0;i--)
-  {
-   GPIO_SetBits(GPIOA,led[i]);
-   delay_ms(100);
-   GPIO_ResetBits(GPIOA, led[i]);
-   delay_ms(100);
-  }
- }
- void testled()
- {
-  GPIO_SetBits(GPIOA, GPIO_Pin_2);
-    delay_ms(100);
-    GPIO_ResetBits(GPIOA, GPIO_Pin_2);
-    delay_ms(100);
- }
- void batled(int i)
- {
 
- }
+int _write(int file, char *ptr, int len)
+{
+  for (int i = len; i != 0; i--)
+  {
+    while ((USART1->SR & USART_FLAG_TXE) == 0);
+    USART1->DR = *ptr++;
+  }
+  return len;
+}
 
-/*******************************/
+
+/**************************************/
+void LED_B2_config(void)
+{
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);  // Enable clock for GPIOB
+
+	GPIO_InitTypeDef	led_b2_init_struct;
+	led_b2_init_struct.GPIO_Pin = GPIO_Pin_0;
+	led_b2_init_struct.GPIO_Speed = GPIO_Speed_50MHz;
+	led_b2_init_struct.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_Init(GPIOB, &led_b2_init_struct);
+}
+
+
+/**************************************/
 int main(void)
 {
   DWT_config();
+  UART1_Init_A9A10();
+  LED_B2_config();
+  PrintSystemInfo();
 
-  LED_A0_config();
-
-
+  int counter = 0;
 
   while (1)
   {
+    printf("%x\n", counter++);
+    printf("het truyen\n");
 
-  //giot_nuoc();
-  //delay_ms(100);
-  //traiphai();
-  //delay_ms(100);
-  testled();
-   }
-} // end main
+    GPIO_SetBits(GPIOB, GPIO_Pin_0);
+    delay_ms(500);
+    GPIO_ResetBits(GPIOB, GPIO_Pin_0);
+    delay_ms(500);
+  }
+}
 
 
-/*******************************/
-
+/**************************************/
